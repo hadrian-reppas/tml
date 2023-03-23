@@ -1,31 +1,24 @@
-use std::collections::VecDeque;
-
 use crate::error::Error;
 use crate::lex::{Span, Token, TokenKind, Tokens};
 
 #[derive(Clone, Debug)]
-pub struct Upper {
+pub struct Name {
     pub name: &'static str,
     pub span: Span,
 }
 
 #[derive(Clone, Debug)]
-pub struct Lower {
-    pub name: &'static str,
+pub struct Symbol {
+    pub symbol: String,
     pub span: Span,
 }
 
 #[derive(Clone, Debug)]
 pub struct State {
-    pub name: Lower,
-    pub params: Vec<Param>,
+    pub name: Name,
+    pub state_params: Vec<Name>,
+    pub symbol_params: Vec<Name>,
     pub arms: Vec<Arm>,
-}
-
-#[derive(Clone, Debug)]
-pub enum Param {
-    Upper(Upper),
-    Lower(Lower),
 }
 
 #[derive(Clone, Debug)]
@@ -37,170 +30,190 @@ pub struct Arm {
 
 #[derive(Clone, Debug)]
 pub enum Pattern {
-    Symbol(String),
-    Lower(Lower),
-    Under,
+    Symbol(Symbol),
+    Name(Name),
 }
 
 #[derive(Clone, Debug)]
-pub struct Op {
-    pub kind: OpKind,
-    pub span: Span,
+pub enum Op {
+    Left(Span),
+    Right(Span),
+    Name(Name),
+    Symbol(Symbol),
 }
 
 #[derive(Clone, Debug)]
-pub enum OpKind {
-    Left,
-    Right,
-    Lower(Lower),
-    Symbol(String),
+pub enum ToState {
+    State {
+        name: Name,
+        state_args: Vec<ToState>,
+        symbol_args: Vec<Pattern>,
+    },
+    Halt {
+        span: Span,
+    },
 }
 
-#[derive(Clone, Debug)]
-pub struct ToState {
-    pub name: Lower,
-    pub args: Vec<Arg>,
-}
-
-#[derive(Clone, Debug)]
-pub enum Arg {
-    Upper(Upper),
-    ToState(ToState),
-    Symbol(String),
-}
-
-pub fn parse(tokens: Tokens) -> Result<Vec<State>, Error> {
+pub fn parse(mut tokens: Tokens) -> Result<Vec<State>, Error> {
+    let peek_one = tokens.next()?;
+    let peek_two = tokens.next()?;
     let mut parser = Parser {
         tokens,
-        peek: VecDeque::new(),
+        peek_one,
+        peek_two,
     };
+
     parser.unit()
 }
 
 struct Parser {
     tokens: Tokens,
-    peek: VecDeque<Token>,
+    peek_one: Token,
+    peek_two: Token,
 }
 
 impl Parser {
-    fn peek(&mut self) -> Result<&TokenKind, Error> {
-        if self.peek.is_empty() {
-            self.peek.push_back(self.tokens.next()?);
-        }
-        Ok(&self.peek[0].kind)
+    fn peek(&self) -> &TokenKind {
+        &self.peek_one.kind
     }
 
-    fn peek_two(&mut self) -> Result<[&TokenKind; 2], Error> {
-        while self.peek.len() < 2 {
-            self.peek.push_back(self.tokens.next()?);
-        }
-        Ok([&self.peek[0].kind, &self.peek[1].kind])
+    fn peek_two(&self) -> [&TokenKind; 2] {
+        [&self.peek_one.kind, &self.peek_two.kind]
     }
 
     fn next(&mut self) -> Result<Token, Error> {
-        if let Some(token) = self.peek.pop_front() {
-            Ok(token)
-        } else {
-            self.tokens.next()
-        }
+        let peek_two = self.tokens.next()?;
+        let peek_one = std::mem::replace(&mut self.peek_two, peek_two);
+        let next = std::mem::replace(&mut self.peek_one, peek_one);
+        Ok(next)
     }
 
-    fn peek_span(&mut self) -> Result<Span, Error> {
-        if self.peek.is_empty() {
-            self.peek.push_back(self.tokens.next()?);
-        }
-        Ok(self.peek[0].span)
+    fn peek_span(&mut self) -> Span {
+        self.peek_one.span
     }
 
     fn expect(&mut self, kind: TokenKind) -> Result<Token, Error> {
-        if self.peek()? == &kind {
+        if self.peek() == &kind {
             self.next()
         } else {
             Err(Error::new(
-                format!("expected {}, found {}", kind.desc(), self.peek()?.desc()),
-                Some(self.peek_span()?),
+                format!("expected {}, found {}", kind.desc(), self.peek().desc()),
+                Some(self.peek_span()),
             ))
         }
     }
 
-    fn lower(&mut self) -> Result<Lower, Error> {
-        let token = self.expect(TokenKind::Lower)?;
-        Ok(Lower {
+    fn name(&mut self) -> Result<Name, Error> {
+        let token = self.expect(TokenKind::Name)?;
+        Ok(Name {
             name: token.span.text,
             span: token.span,
         })
     }
 
-    fn upper(&mut self) -> Result<Upper, Error> {
-        let token = self.expect(TokenKind::Upper)?;
-        Ok(Upper {
-            name: token.span.text,
-            span: token.span,
-        })
+    fn symbol(&mut self) -> Result<Symbol, Error> {
+        if matches!(self.peek(), TokenKind::Symbol(_)) {
+            match self.next()? {
+                Token {
+                    kind: TokenKind::Symbol(symbol),
+                    span,
+                } => Ok(Symbol { symbol, span }),
+                _ => unreachable!(),
+            }
+        } else {
+            Err(Error::new(
+                format!("expected symbol, found {}", self.peek().desc()),
+                Some(self.peek_span()),
+            ))
+        }
     }
 
     fn unit(&mut self) -> Result<Vec<State>, Error> {
         let mut unit = Vec::new();
-        while self.peek()? != &TokenKind::Eof {
+        while self.peek() != &TokenKind::Eof {
             unit.push(self.state()?);
         }
         Ok(unit)
     }
 
-    fn state(&mut self) -> Result<State, Error> {
-        let name = self.lower()?;
+    fn parens<T, U>(
+        &mut self,
+        parse_before: impl Fn(&mut Self) -> Result<T, Error>,
+        parse_after: impl Fn(&mut Self) -> Result<U, Error>,
+    ) -> Result<(Vec<T>, Vec<U>), Error> {
+        if self.peek() != &TokenKind::LParen {
+            return Ok((Vec::new(), Vec::new()));
+        }
+        self.expect(TokenKind::LParen)?;
 
-        let mut params = Vec::new();
-        if self.peek_two()? == [&TokenKind::LParen, &TokenKind::RParen] {
-            self.expect(TokenKind::LParen)?;
-            self.expect(TokenKind::RParen)?;
-        } else if self.peek()? == &TokenKind::LParen {
-            self.expect(TokenKind::LParen)?;
-            params.push(self.param()?);
-            while self.peek()? != &TokenKind::RParen
-                && self.peek_two()? != [&TokenKind::Comma, &TokenKind::RParen]
+        let mut before = Vec::new();
+        let mut after = Vec::new();
+
+        if self.peek() == &TokenKind::Semi {
+            self.expect(TokenKind::Semi)?;
+        } else if self.peek() != &TokenKind::RParen {
+            before.push(parse_before(self)?);
+
+            while self.peek() != &TokenKind::Semi
+                && self.peek() != &TokenKind::RParen
+                && self.peek_two() != [&TokenKind::Comma, &TokenKind::RParen]
             {
                 self.expect(TokenKind::Comma)?;
-                params.push(self.param()?);
+                before.push(parse_before(self)?);
             }
-            if self.peek()? == &TokenKind::Comma {
+
+            if self.peek() == &TokenKind::Semi {
+                self.expect(TokenKind::Semi)?;
+            } else if self.peek() == &TokenKind::Comma {
                 self.expect(TokenKind::Comma)?;
             }
-            self.expect(TokenKind::RParen)?;
         }
+
+        if self.peek() != &TokenKind::RParen {
+            after.push(parse_after(self)?);
+
+            while self.peek() != &TokenKind::RParen
+                && self.peek_two() != [&TokenKind::Comma, &TokenKind::RParen]
+            {
+                self.expect(TokenKind::Comma)?;
+                after.push(parse_after(self)?);
+            }
+
+            if self.peek() == &TokenKind::Comma {
+                self.expect(TokenKind::Comma)?;
+            }
+        }
+
+        self.expect(TokenKind::RParen)?;
+        Ok((before, after))
+    }
+
+    fn state(&mut self) -> Result<State, Error> {
+        let name = self.name()?;
+
+        let (state_params, symbol_params) = self.parens(Parser::name, Parser::name)?;
 
         let mut arms = Vec::new();
         self.expect(TokenKind::LBrace)?;
-        while self.peek()? != &TokenKind::RBrace
-            && self.peek_two()? != [&TokenKind::Comma, &TokenKind::RBrace]
+        while self.peek() != &TokenKind::RBrace
+            && self.peek_two() != [&TokenKind::Comma, &TokenKind::RBrace]
         {
             if !arms.is_empty() {
                 self.expect(TokenKind::Comma)?;
             }
             arms.push(self.arm()?);
         }
-        if self.peek()? == &TokenKind::Comma {
+        if self.peek() == &TokenKind::Comma {
             self.expect(TokenKind::Comma)?;
         }
         self.expect(TokenKind::RBrace)?;
 
-        Ok(State { name, params, arms })
-    }
-
-    fn param(&mut self) -> Result<Param, Error> {
-        if self.peek()? == &TokenKind::Lower {
-            Ok(Param::Lower(self.lower()?))
-        } else if self.peek()? == &TokenKind::Upper {
-            Ok(Param::Upper(self.upper()?))
-        } else {
-            Err(Error::new(
-                format!(
-                    "expected uppercase or lowercase name, found {}",
-                    self.peek()?.desc()
-                ),
-                Some(self.peek_span()?),
-            ))
-        }
+        Ok(State {
+            name,
+            state_params,
+            symbol_params,
+            arms,
+        })
     }
 
     fn arm(&mut self) -> Result<Arm, Error> {
@@ -208,7 +221,7 @@ impl Parser {
 
         self.expect(TokenKind::Bar)?;
         let mut ops = Vec::new();
-        while self.peek()? != &TokenKind::Bar {
+        while self.peek() != &TokenKind::Bar {
             ops.push(self.op()?);
         }
 
@@ -223,118 +236,50 @@ impl Parser {
     }
 
     fn pattern(&mut self) -> Result<Pattern, Error> {
-        if self.peek()? == &TokenKind::Under {
-            self.expect(TokenKind::Under)?;
-            Ok(Pattern::Under)
-        } else if self.peek()? == &TokenKind::Lower {
-            Ok(Pattern::Lower(self.lower()?))
-        } else if matches!(self.peek()?, TokenKind::Symbol(_)) {
-            match self.next()? {
-                Token {
-                    kind: TokenKind::Symbol(symbol),
-                    ..
-                } => Ok(Pattern::Symbol(symbol)),
-                _ => unreachable!(),
-            }
-        } else {
-            Err(Error::new(
-                format!(
-                    "expected `_`, symbol or lowercase name, found {}",
-                    self.peek()?.desc()
-                ),
-                Some(self.peek_span()?),
-            ))
+        match self.peek() {
+            TokenKind::Name => Ok(Pattern::Name(self.name()?)),
+            TokenKind::Symbol(_) => Ok(Pattern::Symbol(self.symbol()?)),
+            _ => Err(Error::new(
+                format!("expected name or symbol, found {}", self.peek().desc()),
+                Some(self.peek_span()),
+            )),
         }
     }
 
     fn op(&mut self) -> Result<Op, Error> {
-        if self.peek()? == &TokenKind::Left {
-            let span = self.expect(TokenKind::Left)?.span;
-            Ok(Op {
-                kind: OpKind::Left,
-                span,
-            })
-        } else if self.peek()? == &TokenKind::Right {
-            let span = self.expect(TokenKind::Right)?.span;
-            Ok(Op {
-                kind: OpKind::Right,
-                span,
-            })
-        } else if self.peek()? == &TokenKind::Lower {
-            let lower = self.lower()?;
-            let span = lower.span;
-            Ok(Op {
-                kind: OpKind::Lower(lower),
-                span,
-            })
-        } else if matches!(self.peek()?, TokenKind::Symbol(_)) {
-            match self.next()? {
-                Token {
-                    kind: TokenKind::Symbol(symbol),
-                    span,
-                } => Ok(Op {
-                    kind: OpKind::Symbol(symbol),
-                    span,
-                }),
-                _ => unreachable!(),
-            }
-        } else {
-            Err(Error::new(
+        match self.peek() {
+            TokenKind::Left => Ok(Op::Left(self.expect(TokenKind::Left)?.span)),
+            TokenKind::Right => Ok(Op::Right(self.expect(TokenKind::Right)?.span)),
+            TokenKind::Name => Ok(Op::Name(self.name()?)),
+            TokenKind::Symbol(_) => Ok(Op::Symbol(self.symbol()?)),
+            _ => Err(Error::new(
                 format!(
-                    "expected `<`, `>`, symbol or lowercase name, found {}",
-                    self.peek()?.desc()
+                    "expected `<`, `>`, name or symbol, found {}",
+                    self.peek().desc()
                 ),
-                Some(self.peek_span()?),
-            ))
+                Some(self.peek_span()),
+            )),
         }
     }
 
     fn to_state(&mut self) -> Result<ToState, Error> {
-        let name = self.lower()?;
-
-        let mut args = Vec::new();
-        if self.peek_two()? == [&TokenKind::LParen, &TokenKind::RParen] {
-            self.expect(TokenKind::LParen)?;
-            self.expect(TokenKind::RParen)?;
-        } else if self.peek()? == &TokenKind::LParen {
-            self.expect(TokenKind::LParen)?;
-            args.push(self.arg()?);
-            while self.peek()? != &TokenKind::RParen
-                && self.peek_two()? != [&TokenKind::Comma, &TokenKind::RParen]
-            {
-                self.expect(TokenKind::Comma)?;
-                args.push(self.arg()?);
+        match self.peek() {
+            TokenKind::Name => {
+                let name = self.name()?;
+                let (state_args, symbol_args) = self.parens(Parser::to_state, Parser::pattern)?;
+                Ok(ToState::State {
+                    name,
+                    state_args,
+                    symbol_args,
+                })
             }
-            if self.peek()? == &TokenKind::Comma {
-                self.expect(TokenKind::Comma)?;
-            }
-            self.expect(TokenKind::RParen)?;
-        }
-
-        Ok(ToState { name, args })
-    }
-
-    fn arg(&mut self) -> Result<Arg, Error> {
-        if self.peek()? == &TokenKind::Lower {
-            Ok(Arg::ToState(self.to_state()?))
-        } else if self.peek()? == &TokenKind::Upper {
-            Ok(Arg::Upper(self.upper()?))
-        } else if matches!(self.peek()?, TokenKind::Symbol(_)) {
-            match self.next()? {
-                Token {
-                    kind: TokenKind::Symbol(symbol),
-                    ..
-                } => Ok(Arg::Symbol(symbol)),
-                _ => unreachable!(),
-            }
-        } else {
-            Err(Error::new(
-                format!(
-                    "expected symbol, lowercase name or uppercase name, found {}",
-                    self.peek()?.desc()
-                ),
-                Some(self.peek_span()?),
-            ))
+            TokenKind::Bang => Ok(ToState::Halt {
+                span: self.expect(TokenKind::Bang)?.span,
+            }),
+            _ => Err(Error::new(
+                format!("expected name or `!`, found {}", self.peek().desc()),
+                Some(self.peek_span()),
+            )),
         }
     }
 }

@@ -5,6 +5,7 @@ use clap::Parser;
 
 mod error;
 mod lex;
+mod parse;
 
 #[derive(Parser, Debug)]
 struct Arguments {
@@ -66,7 +67,7 @@ fn main() -> ExitCode {
         ..
     } = Arguments::parse();
 
-    match do_it(file, no_color, allow_tabs) {
+    match do_it(file, allow_tabs) {
         Ok(_) => ExitCode::SUCCESS,
         Err(error) => {
             error.print(no_color);
@@ -75,15 +76,9 @@ fn main() -> ExitCode {
     }
 }
 
-fn do_it(path: PathBuf, no_color: bool, allow_tabs: bool) -> Result<(), error::Error> {
-    let mut tokens = lex::Tokens::from_path_buf(path, allow_tabs)?;
-    loop {
-        let token = tokens.next()?;
-        println!("{:?}", token.kind);
-        token.span.print(no_color);
-        println!();
-        if matches!(token.kind, lex::TokenKind::Eof) {
-            return Ok(());
-        }
-    }
+fn do_it(path: PathBuf, allow_tabs: bool) -> Result<(), error::Error> {
+    let tokens = lex::Tokens::from_path_buf(path, allow_tabs)?;
+    let unit = parse::parse(tokens)?;
+    println!("{unit:#?}");
+    Ok(())
 }

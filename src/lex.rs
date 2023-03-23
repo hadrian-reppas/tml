@@ -7,7 +7,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::error::Error;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Span {
     pub text: &'static str,
     pub prefix: &'static str,
@@ -86,21 +86,47 @@ impl Span {
     }
 }
 
-#[derive(Clone, Debug)]
+impl std::fmt::Debug for Span {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Span({:?})", self.text)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum TokenKind {
     LParen,
     RParen,
     LBrace,
     RBrace,
     Comma,
+    Semi,
     Bar,
+    Bang,
     Left,
     Right,
-    Lower,
-    Upper,
-    Under,
+    Name,
     Symbol(String),
     Eof,
+}
+
+impl TokenKind {
+    pub fn desc(&self) -> &'static str {
+        match self {
+            TokenKind::LParen => "`(`",
+            TokenKind::RParen => "`)`",
+            TokenKind::LBrace => "`{`",
+            TokenKind::RBrace => "`}`",
+            TokenKind::Comma => "`,`",
+            TokenKind::Semi => "`;`",
+            TokenKind::Bar => "`|`",
+            TokenKind::Bang => "`!`",
+            TokenKind::Left => "`<`",
+            TokenKind::Right => "`>`",
+            TokenKind::Name => "name",
+            TokenKind::Symbol(_) => "symbol",
+            TokenKind::Eof => "end of file",
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -193,7 +219,9 @@ impl Tokens {
             Some('{') => token!(LBrace),
             Some('}') => token!(RBrace),
             Some(',') => token!(Comma),
+            Some(';') => token!(Semi),
             Some('|') => token!(Bar),
+            Some('!') => token!(Bang),
             Some('<') => token!(Left),
             Some('>') => token!(Right),
             Some('\'') => self.symbol(),
@@ -247,42 +275,12 @@ impl Tokens {
                 break;
             }
         }
-        let span = self.make_span(len);
 
-        if span.text == "_" {
-            Ok(Token {
-                kind: TokenKind::Under,
-                span,
-            })
-        } else if span.text.chars().all(|c| c == '_') {
-            Err(Error::new(
-                "multiple underscores are not allowed".to_string(),
-                Some(span),
-            ))
-        } else if span
-            .text
-            .chars()
-            .all(|c| !c.is_alphabetic() || c.is_uppercase())
-        {
-            Ok(Token {
-                kind: TokenKind::Upper,
-                span,
-            })
-        } else if span
-            .text
-            .chars()
-            .all(|c| !c.is_alphabetic() || c.is_lowercase())
-        {
-            Ok(Token {
-                kind: TokenKind::Lower,
-                span,
-            })
-        } else {
-            Err(Error::new(
-                "cannot mix uppercase and lowercase letters".to_string(),
-                Some(span),
-            ))
-        }
+        let span = self.make_span(len);
+        Ok(Token {
+            kind: TokenKind::Name,
+            span,
+        })
     }
 
     fn symbol(&mut self) -> Result<Token, Error> {
