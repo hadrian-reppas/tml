@@ -151,7 +151,7 @@ impl Tokens {
         let path: &'static Path = Box::leak(Box::new(path));
 
         let Ok(code) = fs::read_to_string(path) else {
-            return Err(Error::new(format!("cannot read file {}", path.display()), None));
+            return Err(Error::new(format!("couldn't read file {}", path.display()), None));
         };
         let code = Box::leak(Box::new(code));
 
@@ -225,8 +225,8 @@ impl Tokens {
             Some('<') => token!(Left),
             Some('>') => token!(Right),
             Some('\'') => self.symbol(),
-            Some('_') => self.name(),
-            Some(c) if c.is_alphabetic() => self.name(),
+            Some('_') => Ok(self.name()),
+            Some(c) if c.is_alphabetic() => Ok(self.name()),
             Some(c) => Err(Error::new(
                 format!("unexpected character {c:?}"),
                 Some(self.make_span(1)),
@@ -248,8 +248,7 @@ impl Tokens {
 
     fn strip_whitespace(&mut self) -> Result<(), Error> {
         let mut len = 0;
-        let mut chars = self.suffix.chars();
-        while let Some(c) = chars.next() {
+        for c in self.suffix.chars() {
             if !c.is_whitespace() {
                 break;
             } else if !self.allow_tabs && c == '\t' {
@@ -265,10 +264,9 @@ impl Tokens {
         Ok(())
     }
 
-    fn name(&mut self) -> Result<Token, Error> {
+    fn name(&mut self) -> Token {
         let mut len = 0;
-        let mut chars = self.suffix.chars();
-        while let Some(c) = chars.next() {
+        for c in self.suffix.chars() {
             if c.is_alphanumeric() || c == '_' {
                 len += c.len_utf8();
             } else {
@@ -277,10 +275,10 @@ impl Tokens {
         }
 
         let span = self.make_span(len);
-        Ok(Token {
+        Token {
             kind: TokenKind::Name,
             span,
-        })
+        }
     }
 
     fn symbol(&mut self) -> Result<Token, Error> {
@@ -307,7 +305,7 @@ impl Tokens {
             Ok(Some(('\'', 2)))
         } else if self.suffix[start..].starts_with('\\') {
             self.make_span(start);
-            let len = 1 + (self.suffix.len() > start + 1) as usize;
+            let len = 1 + usize::from(self.suffix.len() > start + 1);
             Err(Error::new(
                 "invalid escape sequence (only '\\'' and '\\\\' are supported)".to_string(),
                 Some(self.make_span(len)),
