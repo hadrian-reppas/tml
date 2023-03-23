@@ -318,7 +318,7 @@ impl Tokens {
             } else {
                 self.make_span(start);
                 Err(Error::new(
-                    "weird characters are not allowed".to_string(),
+                    format!("weird character {c:?} is not allowed"),
                     Some(self.make_span(1)),
                 ))
             }
