@@ -3,6 +3,8 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
+mod bytecode;
+mod compile;
 mod error;
 mod lex;
 mod parse;
@@ -57,6 +59,10 @@ struct Arguments {
     /// Allow tab characters in machine and tape files
     #[arg(long = "allow-tabs")]
     allow_tabs: bool,
+
+    /// Dump bytecode
+    #[arg(short = 'b', long = "dump-bytecode")]
+    dump_bytecode: bool,
 }
 
 fn main() -> ExitCode {
@@ -64,10 +70,11 @@ fn main() -> ExitCode {
         file,
         no_color,
         allow_tabs,
+        dump_bytecode,
         ..
     } = Arguments::parse();
 
-    match do_it(file, allow_tabs) {
+    match do_it(file, no_color, allow_tabs, dump_bytecode) {
         Ok(_) => ExitCode::SUCCESS,
         Err(error) => {
             error.print(no_color);
@@ -76,9 +83,17 @@ fn main() -> ExitCode {
     }
 }
 
-fn do_it(path: PathBuf, allow_tabs: bool) -> Result<(), error::Error> {
+fn do_it(
+    path: PathBuf,
+    no_color: bool,
+    allow_tabs: bool,
+    dump_bytecode: bool,
+) -> Result<(), error::Error> {
     let tokens = lex::Tokens::from_path_buf(path, allow_tabs)?;
     let unit = parse::parse(tokens)?;
-    println!("{unit:#?}");
+    let compiled = compile::compile(unit)?;
+    if dump_bytecode {
+        bytecode::dump(&mut compiled.bytes.iter().copied(), no_color);
+    }
     Ok(())
 }
