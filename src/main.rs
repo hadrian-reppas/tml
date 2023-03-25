@@ -6,6 +6,7 @@ use clap::Parser;
 mod bytecode;
 mod compile;
 mod error;
+mod ffi;
 mod lex;
 mod parse;
 mod vm;
@@ -64,6 +65,10 @@ struct Arguments {
     /// Dump bytecode
     #[arg(short = 'b', long = "dump-bytecode")]
     dump_bytecode: bool,
+
+    /// Use Rust VM
+    #[arg(long = "rust-vm")]
+    rust_vm: bool,
 }
 
 fn main() -> ExitCode {
@@ -73,10 +78,18 @@ fn main() -> ExitCode {
         no_color,
         allow_tabs,
         dump_bytecode,
+        rust_vm,
         ..
     } = Arguments::parse();
 
-    match do_it(file, max_moves, no_color, allow_tabs, dump_bytecode) {
+    match do_it(
+        file,
+        max_moves.unwrap_or(usize::MAX),
+        no_color,
+        allow_tabs,
+        dump_bytecode,
+        rust_vm,
+    ) {
         Ok(_) => ExitCode::SUCCESS,
         Err(error) => {
             error.print(no_color);
@@ -87,18 +100,26 @@ fn main() -> ExitCode {
 
 fn do_it(
     path: PathBuf,
-    max_moves: Option<usize>,
+    max_moves: usize,
     no_color: bool,
     allow_tabs: bool,
     dump_bytecode: bool,
+    rust_vm: bool,
 ) -> Result<(), error::Error> {
     let tokens = lex::Tokens::from_path_buf(path, allow_tabs)?;
     let unit = parse::parse(tokens)?;
     let compiled = compile::compile(unit)?;
+
     if dump_bytecode {
         bytecode::dump(&mut compiled.bytes.iter().copied(), no_color);
     }
-    let simulated = vm::simulate(&compiled.bytes, Vec::new(), max_moves.unwrap_or(usize::MAX));
+
+    let simulated = if rust_vm {
+        vm::simulate(&compiled.bytes, Vec::new(), max_moves)
+    } else {
+        ffi::simulate(&compiled.bytes, &[], max_moves)
+    };
+
     println!("{:?}", simulated.tape);
     println!("{}", simulated.moves);
     Ok(())
