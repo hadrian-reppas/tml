@@ -7,8 +7,6 @@ use crate::error::Error;
 use crate::lex::Span;
 use crate::parse::{Arm, Name, Op, Pattern, State, Symbol, ToState};
 
-const HALT_ADDRESS: u32 = 6;
-
 pub struct Compiled {
     pub bytes: Vec<u8>,
     pub symbols: BiMap<String, u16>,
@@ -284,9 +282,21 @@ impl Compiler {
                 symbol_args,
             } => match arg_counts.get(name.name) {
                 Some(1) => {
-                    self.bytes.push(bc::TAKE_ARG);
-                    self.bytes.push(state_map[name.name]);
-                    Ok(())
+                    if is_outer {
+                        for (arg, count) in arg_counts {
+                            if *count == 0 {
+                                self.bytes.push(bc::FREE_ARG);
+                                self.bytes.push(state_map[arg]);
+                            }
+                        }
+                        self.bytes.push(bc::FINAL_ARG);
+                        self.bytes.push(state_map[name.name]);
+                        Ok(())
+                    } else {
+                        self.bytes.push(bc::TAKE_ARG);
+                        self.bytes.push(state_map[name.name]);
+                        Ok(())
+                    }
                 }
                 Some(&count) => {
                     self.bytes.push(bc::CLONE_ARG);
@@ -333,8 +343,8 @@ impl Compiler {
                     match (self.addresses.get(&signature), is_outer) {
                         (Some(&address), false) => {
                             self.bytes.push(bc::MAKE_STATE);
-                            self.bytes.extend(&address.to_le_bytes());
                             self.bytes.push(signature.states);
+                            self.bytes.extend(&address.to_le_bytes());
                         }
                         (Some(&address), true) => {
                             for (arg, count) in arg_counts {
@@ -349,14 +359,13 @@ impl Compiler {
                         }
                         (None, false) => {
                             self.bytes.push(bc::MAKE_STATE);
+                            self.bytes.push(signature.states);
 
                             let forward_ref = ForwardRef {
                                 location: self.bytes.len(),
                                 span: name.span,
                             };
-
                             self.bytes.extend(&u32::MAX.to_le_bytes());
-                            self.bytes.push(signature.states);
 
                             match self.forward_refs.entry(signature) {
                                 Entry::Occupied(mut o) => o.get_mut().push(forward_ref),
@@ -397,12 +406,12 @@ impl Compiler {
             ToState::Halt { .. } => {
                 if is_outer {
                     self.bytes.push(bc::FINAL_STATE);
-                    self.bytes.extend(HALT_ADDRESS.to_le_bytes());
+                    self.bytes.extend(bc::HALT_ADDRESS.to_le_bytes());
                     Ok(())
                 } else {
                     self.bytes.push(bc::MAKE_STATE);
-                    self.bytes.extend(HALT_ADDRESS.to_le_bytes());
                     self.bytes.push(0);
+                    self.bytes.extend(bc::HALT_ADDRESS.to_le_bytes());
                     Ok(())
                 }
             }

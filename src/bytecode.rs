@@ -21,6 +21,9 @@ pub const CLONE_ARG: u8 = 15;
 pub const FREE_ARG: u8 = 16;
 pub const MAKE_STATE: u8 = 17;
 pub const FINAL_STATE: u8 = 18;
+pub const FINAL_ARG: u8 = 19;
+
+pub const HALT_ADDRESS: u32 = 6;
 
 pub fn dump(bytes: &mut dyn Iterator<Item = u8>, no_color: bool) {
     let mut dumper = Dumper {
@@ -197,7 +200,7 @@ impl Dumper<'_> {
                 }
                 SYMBOL_BOUND => {
                     state_instr!();
-                    text!(self, "    SYMBOL_BOUND", Green);
+                    textln!(self, "    SYMBOL_BOUND", Green);
                 }
                 TAKE_ARG => {
                     state_instr!();
@@ -218,15 +221,21 @@ impl Dumper<'_> {
                     state_instr!();
                     text!(self, "    MAKE_STATE", Green);
                     println!(
-                        " (addr: {:#010x}) (args: {})",
-                        self.next_u32(),
-                        self.next_u8()
+                        " (args: {}) (addr: {:#010x})",
+                        self.next_u8(),
+                        self.next_u32()
                     );
                 }
                 FINAL_STATE => {
                     state_instr!();
                     text!(self, "    FINAL_STATE", Green);
                     println!(" (addr: {:#010x})", self.next_u32());
+                    return !is_last_arm;
+                }
+                FINAL_ARG => {
+                    state_instr!();
+                    text!(self, "    FINAL_ARG", Green);
+                    println!(" (arg: {})", self.next_u8());
                     return !is_last_arm;
                 }
 

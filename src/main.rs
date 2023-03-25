@@ -8,6 +8,7 @@ mod compile;
 mod error;
 mod lex;
 mod parse;
+mod vm;
 
 #[derive(Parser, Debug)]
 struct Arguments {
@@ -68,13 +69,14 @@ struct Arguments {
 fn main() -> ExitCode {
     let Arguments {
         file,
+        max_moves,
         no_color,
         allow_tabs,
         dump_bytecode,
         ..
     } = Arguments::parse();
 
-    match do_it(file, no_color, allow_tabs, dump_bytecode) {
+    match do_it(file, max_moves, no_color, allow_tabs, dump_bytecode) {
         Ok(_) => ExitCode::SUCCESS,
         Err(error) => {
             error.print(no_color);
@@ -85,6 +87,7 @@ fn main() -> ExitCode {
 
 fn do_it(
     path: PathBuf,
+    max_moves: Option<usize>,
     no_color: bool,
     allow_tabs: bool,
     dump_bytecode: bool,
@@ -95,5 +98,8 @@ fn do_it(
     if dump_bytecode {
         bytecode::dump(&mut compiled.bytes.iter().copied(), no_color);
     }
+    let simulated = vm::simulate(&compiled.bytes, Vec::new(), max_moves.unwrap_or(usize::MAX));
+    println!("{:?}", simulated.tape);
+    println!("{}", simulated.moves);
     Ok(())
 }
