@@ -11,9 +11,10 @@ pub struct Compiled {
     pub bytes: Vec<u8>,
     pub symbols: BiMap<String, u16>,
     pub states: HashMap<u32, String>,
+    pub tape: Vec<u16>,
 }
 
-pub fn compile(unit: Vec<State>) -> Result<Compiled, Error> {
+pub fn compile(unit: Vec<State>, symbols: Vec<Symbol>) -> Result<Compiled, Error> {
     let mut compiler = Compiler {
         bytes: vec![0, 0, 0xff, 0xff, 0xff, 0xff, bc::HALT],
         forward_refs: HashMap::new(),
@@ -24,10 +25,17 @@ pub fn compile(unit: Vec<State>) -> Result<Compiled, Error> {
     };
 
     compiler.compile()?;
+
+    let mut tape = Vec::with_capacity(symbols.len());
+    for symbol in symbols {
+        tape.push(compiler.symbols.insert(symbol)?);
+    }
+
     Ok(Compiled {
         bytes: compiler.bytes,
         symbols: compiler.symbols.0,
         states: compiler.state_names,
+        tape,
     })
 }
 

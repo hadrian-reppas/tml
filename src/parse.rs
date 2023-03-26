@@ -66,6 +66,28 @@ pub fn parse(mut tokens: Tokens) -> Result<Vec<State>, Error> {
     parser.unit()
 }
 
+pub fn parse_tape(mut tokens: Tokens) -> Result<Vec<Symbol>, Error> {
+    let mut symbols = Vec::new();
+    loop {
+        match tokens.next()? {
+            Token {
+                kind: TokenKind::Symbol(symbol),
+                span,
+            } => symbols.push(Symbol { symbol, span }),
+            Token {
+                kind: TokenKind::Eof,
+                ..
+            } => return Ok(symbols),
+            Token { span, .. } => {
+                return Err(Error::new(
+                    "only symbols are allowed in tape file".to_string(),
+                    Some(span),
+                ))
+            }
+        }
+    }
+}
+
 struct Parser {
     tokens: Tokens,
     peek_one: Token,

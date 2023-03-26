@@ -18,7 +18,7 @@ pub fn simulate(bytes: &[u8], tape: &[u16], max_moves: usize) -> Simulated {
 
         let tape = std::slice::from_raw_parts(get_tape(), get_tape_len()).to_vec();
         free_tape();
-        
+
         Simulated {
             tape,
             head_position: get_tape_head_position(),

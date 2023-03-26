@@ -74,6 +74,7 @@ struct Arguments {
 fn main() -> ExitCode {
     let Arguments {
         file,
+        tape,
         max_moves,
         no_color,
         allow_tabs,
@@ -84,6 +85,7 @@ fn main() -> ExitCode {
 
     match do_it(
         file,
+        tape,
         max_moves.unwrap_or(usize::MAX),
         no_color,
         allow_tabs,
@@ -100,6 +102,7 @@ fn main() -> ExitCode {
 
 fn do_it(
     path: PathBuf,
+    tape: Option<PathBuf>,
     max_moves: usize,
     no_color: bool,
     allow_tabs: bool,
@@ -108,16 +111,23 @@ fn do_it(
 ) -> Result<(), error::Error> {
     let tokens = lex::Tokens::from_path_buf(path, allow_tabs)?;
     let unit = parse::parse(tokens)?;
-    let compiled = compile::compile(unit)?;
+
+    let compiled = if let Some(path) = tape {
+        let tokens = lex::Tokens::from_path_buf(path, allow_tabs)?;
+        let symbols = parse::parse_tape(tokens)?;
+        compile::compile(unit, symbols)?
+    } else {
+        compile::compile(unit, Vec::new())?
+    };
 
     if dump_bytecode {
         bytecode::dump(&mut compiled.bytes.iter().copied(), no_color);
     }
 
     let simulated = if rust_vm {
-        vm::simulate(&compiled.bytes, Vec::new(), max_moves)
+        vm::simulate(&compiled.bytes, compiled.tape, max_moves)
     } else {
-        ffi::simulate(&compiled.bytes, &[], max_moves)
+        ffi::simulate(&compiled.bytes, &compiled.tape, max_moves)
     };
 
     println!("{:?}", simulated.tape);
