@@ -7,8 +7,8 @@ extern "C" {
     fn get_tape() -> *const u16;
     fn get_tape_len() -> usize;
     fn get_tape_head_position() -> usize;
-    fn free_tape();
     fn get_move_count() -> usize;
+    fn cleanup();
 }
 
 pub fn simulate(bytes: &[u8], tape: &[u16], max_moves: usize) -> Simulated {
@@ -16,8 +16,12 @@ pub fn simulate(bytes: &[u8], tape: &[u16], max_moves: usize) -> Simulated {
         init_tape(tape.as_ptr(), tape.len());
         run(bytes.as_ptr(), max_moves);
 
-        let tape = std::slice::from_raw_parts(get_tape(), get_tape_len()).to_vec();
-        free_tape();
+        let mut tape = std::slice::from_raw_parts(get_tape(), get_tape_len()).to_vec();
+        while let Some(0) = tape.last() {
+            tape.pop();
+        }
+
+        cleanup();
 
         Simulated {
             tape,
