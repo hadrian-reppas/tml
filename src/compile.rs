@@ -313,6 +313,24 @@ impl Compiler {
                     Ok(())
                 }
                 None => {
+                    if state_args.len() > 255 {
+                        return Err(Error::new(
+                            format!(
+                                "`{}` is called with too many state arguments (max is 255)",
+                                name.name
+                            ),
+                            Some(name.span),
+                        ));
+                    } else if symbol_args.len() > 255 {
+                        return Err(Error::new(
+                            format!(
+                                "`{}` is called with too many symbol arguments (max is 255)",
+                                name.name
+                            ),
+                            Some(name.span),
+                        ));
+                    }
+
                     let signature = Signature {
                         name: name.name,
                         states: state_args.len() as u8,
@@ -453,7 +471,7 @@ fn make_map(params: &[Name], kind: &str) -> Result<HashMap<&'static str, u8>, Er
             ));
         } else if map.len() == 256 {
             return Err(Error::new(
-                format!("too many {kind} parameters (max is 256)"),
+                format!("too many {kind} parameters (max is 255)"),
                 Some(name.span),
             ));
         } else {
