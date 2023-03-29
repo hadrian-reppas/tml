@@ -4,8 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <stdio.h>
-
 #define COMPARE_ARG 0
 #define COMPARE_VAL 1
 #define OTHER 2
@@ -30,7 +28,7 @@
 #define FINAL_ARG 19
 
 #define INTIAL_TAPE_CAPACITY 256
-#define EXTRA_TAPE_RESIZE_ROOM 256
+#define TAPE_GROWTH_FACTOR 2
 #define STATE_STACK_CAPACITY 1024
 
 #define ControlFlow bool
@@ -139,7 +137,7 @@ void write_tape(uint16_t value) {
     if (value) {
       size_t head_offset = tape_head - tape;
       size_t old_len = tape_end - tape;
-      size_t new_len = head_offset + EXTRA_TAPE_RESIZE_ROOM;
+      size_t new_len = TAPE_GROWTH_FACTOR * head_offset;
 
       tape = realloc(tape, new_len * sizeof(uint16_t));
       memset(&tape[old_len], 0, new_len - old_len);
@@ -182,11 +180,6 @@ void push_state(State state) {
 }
 
 ControlFlow run_rhs() {
-  // printf("next opcode: %d\n", next());
-  // printf("and then: %d\n", next());
-  // printf("and address: %d\n", next_u32());
-  // assert(0);
-
   while (true) {
     switch (next()) {
     case LEFT: {

@@ -172,7 +172,7 @@ impl Dumper<'_> {
                 RIGHT => textln!(self, "    RIGHT", Green),
                 LEFT_N => {
                     text!(self, "    LEFT_N", Green);
-                    println!(" ({})", self.next_u8());
+                    println!(" (n: {})", self.next_u8());
                 }
                 RIGHT_N => {
                     text!(self, "    RIGHT_N", Green);
