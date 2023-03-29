@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::time::Instant;
 
 use clap::Parser;
+use termion::{color, style};
 
 mod bytecode;
 mod compile;
@@ -69,29 +71,16 @@ struct Arguments {
     /// Use Rust VM
     #[arg(long = "rust-vm")]
     rust_vm: bool,
+
+    /// Time execution
+    #[arg(short = 't', long = "time")]
+    time: bool,
 }
 
 fn main() -> ExitCode {
-    let Arguments {
-        file,
-        tape,
-        max_moves,
-        no_color,
-        allow_tabs,
-        dump_bytecode,
-        rust_vm,
-        ..
-    } = Arguments::parse();
-
-    match do_it(
-        file,
-        tape,
-        max_moves.unwrap_or(usize::MAX),
-        no_color,
-        allow_tabs,
-        dump_bytecode,
-        rust_vm,
-    ) {
+    let args = Arguments::parse();
+    let no_color = args.no_color;
+    match do_it(args) {
         Ok(_) => ExitCode::SUCCESS,
         Err(error) => {
             error.print(no_color);
@@ -100,41 +89,65 @@ fn main() -> ExitCode {
     }
 }
 
-fn do_it(
-    path: PathBuf,
-    tape: Option<PathBuf>,
-    max_moves: usize,
-    no_color: bool,
-    allow_tabs: bool,
-    dump_bytecode: bool,
-    rust_vm: bool,
-) -> Result<(), error::Error> {
-    let tokens = lex::Tokens::from_path_buf(path, allow_tabs)?;
+fn do_it(args: Arguments) -> Result<(), error::Error> {
+    let start = Instant::now();
+
+    let tokens = lex::Tokens::from_path_buf(args.file, args.allow_tabs)?;
     let unit = parse::parse(tokens)?;
 
-    let compiled = if let Some(path) = tape {
-        let tokens = lex::Tokens::from_path_buf(path, allow_tabs)?;
+    let compiled = if let Some(path) = args.tape {
+        let tokens = lex::Tokens::from_path_buf(path, args.allow_tabs)?;
         let symbols = parse::parse_tape(tokens)?;
         compile::compile(unit, symbols)?
     } else {
         compile::compile(unit, Vec::new())?
     };
 
-    if dump_bytecode {
-        bytecode::dump(&mut compiled.bytes.iter().copied(), no_color);
+    let compile_time = start.elapsed();
+
+    if args.dump_bytecode {
+        bytecode::dump(&mut compiled.bytes.iter().copied(), args.no_color);
     }
 
-    let simulated = if rust_vm {
+    let start = Instant::now();
+
+    let max_moves = args.max_moves.unwrap_or(usize::MAX);
+    let simulated = if args.rust_vm {
         vm::simulate(&compiled.bytes, compiled.tape, max_moves)
     } else {
         ffi::simulate(&compiled.bytes, &compiled.tape, max_moves)
     };
 
-    let mut symbol_tape = Vec::new();
-    for i in simulated.tape {
-        symbol_tape.push(&compiled.symbols[i as usize]);
+    let exec_time = start.elapsed();
+
+    if args.time && args.no_color {
+        println!("compile time: {compile_time:?}");
+        println!("execution time: {exec_time:?}");
+    } else if args.time {
+        println!(
+            "{}{}compile time:{}{} {compile_time:?}",
+            style::Bold,
+            color::Fg(color::Green),
+            style::Reset,
+            color::Fg(color::Reset),
+        );
+        println!(
+            "{}{}execution time:{}{} {exec_time:?}",
+            style::Bold,
+            color::Fg(color::Green),
+            style::Reset,
+            color::Fg(color::Reset),
+        );
     }
-    println!("{:?}", symbol_tape);
+
+    if !args.hide_tape {
+        let mut symbol_tape = Vec::new();
+        for i in simulated.tape {
+            symbol_tape.push(&compiled.symbols[i as usize]);
+        }
+        println!("{:?}", symbol_tape);
+    }
+
     println!("{}", simulated.moves);
     Ok(())
 }
