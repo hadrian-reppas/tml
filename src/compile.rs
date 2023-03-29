@@ -1,7 +1,5 @@
 use std::collections::{hash_map::Entry, HashMap, VecDeque};
 
-use bimap::BiMap;
-
 use crate::bytecode as bc;
 use crate::error::Error;
 use crate::lex::Span;
@@ -9,7 +7,7 @@ use crate::parse::{Arm, Name, Op, Pattern, State, Symbol, ToState};
 
 pub struct Compiled {
     pub bytes: Vec<u8>,
-    pub symbols: BiMap<String, u16>,
+    pub symbols: Vec<String>,
     pub states: HashMap<u32, String>,
     pub tape: Vec<u16>,
 }
@@ -31,9 +29,14 @@ pub fn compile(unit: Vec<State>, symbols: Vec<Symbol>) -> Result<Compiled, Error
         tape.push(compiler.symbols.insert(symbol)?);
     }
 
+    let mut symbols = vec![String::new(); compiler.symbols.0.len()];
+    for (symbol, index) in compiler.symbols.0 {
+        symbols[index as usize] = symbol;
+    }
+
     Ok(Compiled {
         bytes: compiler.bytes,
-        symbols: compiler.symbols.0,
+        symbols,
         states: compiler.state_names,
         tape,
     })
@@ -564,19 +567,17 @@ struct ForwardRef {
     span: Span,
 }
 
-struct Symbols(BiMap<String, u16>);
+struct Symbols(HashMap<String, u16>);
 
 impl Symbols {
     fn new() -> Self {
-        let mut map = BiMap::new();
-        map.insert(String::new(), 0);
-        Symbols(map)
+        Symbols(HashMap::from([(String::new(), 0)]))
     }
 
     fn insert(&mut self, symbol: Symbol) -> Result<u16, Error> {
         let Symbol { symbol, span } = symbol;
         let len = self.0.len();
-        if let Some(&value) = self.0.get_by_left(&symbol) {
+        if let Some(&value) = self.0.get(&symbol) {
             Ok(value)
         } else {
             match len.try_into() {

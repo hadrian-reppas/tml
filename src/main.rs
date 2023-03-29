@@ -130,7 +130,11 @@ fn do_it(
         ffi::simulate(&compiled.bytes, &compiled.tape, max_moves)
     };
 
-    println!("{:?}", simulated.tape);
+    let mut symbol_tape = Vec::new();
+    for i in simulated.tape {
+        symbol_tape.push(&compiled.symbols[i as usize]);
+    }
+    println!("{:?}", symbol_tape);
     println!("{}", simulated.moves);
     Ok(())
 }
