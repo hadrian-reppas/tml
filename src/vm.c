@@ -55,6 +55,7 @@ uint32_t address;
 State states[256];
 size_t state_count;
 uint16_t symbols[256];
+size_t symbol_count;
 
 // stacks
 State state_stack[STATE_STACK_CAPACITY];
@@ -277,16 +278,15 @@ ControlFlow run_rhs() {
     }
     case FINAL_STATE: {
       address = next_u32();
-      size_t new_state_count = state_stack_top - state_stack;
-      size_t new_symbol_count = symbol_stack_top - symbol_stack;
+      state_count = state_stack_top - state_stack;
+      symbol_count = symbol_stack_top - symbol_stack;
 
-      if (new_state_count) {
-        memcpy(states, state_stack, new_state_count * sizeof(State));
+      if (state_count) {
+        memcpy(states, state_stack, state_count * sizeof(State));
         state_stack_top = state_stack;
-        state_count = new_state_count;
       }
-      if (new_symbol_count) {
-        memcpy(symbols, symbol_stack, new_symbol_count * sizeof(uint16_t));
+      if (symbol_count) {
+        memcpy(symbols, symbol_stack, symbol_count * sizeof(uint16_t));
         symbol_stack_top = symbol_stack;
       }
 
@@ -298,11 +298,12 @@ ControlFlow run_rhs() {
       State state = states[arg_index];
       address = state.address;
       state_count = state.state_count;
-      if (state.state_count) {
+      if (state_count) {
         memcpy(states, &state.states[0], state.state_count * sizeof(State));
         free(state.states);
       }
-      if (state.symbol_count) {
+      symbol_count = state.symbol_count;
+      if (symbol_count) {
         memcpy(symbols, &state.symbols[0],
                state.symbol_count * sizeof(uint8_t));
         free(state.symbols);
@@ -355,6 +356,7 @@ void run(uint8_t *bytes, size_t max_moves_) {
 
   next_u16();
   state_count = 0;
+  symbol_count = 0;
   address = next_u32();
   go_to(address);
 
