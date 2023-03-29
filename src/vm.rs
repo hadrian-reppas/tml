@@ -205,13 +205,11 @@ impl Tape {
     }
 
     fn write(&mut self, value: u16) {
-        if value != 0 {
-            if self.head < self.tape.len() {
-                self.tape[self.head] = value;
-            } else {
-                self.tape.resize(self.head + EXTRA_RESIZE_ROOM, 0);
-                self.tape[self.head] = value;
-            }
+        if self.head < self.tape.len() {
+            self.tape[self.head] = value;
+        } else if value != 0 {
+            self.tape.resize(self.head + EXTRA_RESIZE_ROOM, 0);
+            self.tape[self.head] = value;
         }
     }
 }

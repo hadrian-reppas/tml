@@ -133,10 +133,10 @@ uint16_t read_tape() {
 }
 
 void write_tape(uint16_t value) {
-  if (value) {
-    if (tape_head < tape_end) {
-      *tape_head = value;
-    } else {
+  if (tape_head < tape_end) {
+    *tape_head = value;
+  } else {
+    if (value) {
       size_t head_offset = tape_head - tape;
       size_t old_len = tape_end - tape;
       size_t new_len = head_offset + EXTRA_TAPE_RESIZE_ROOM;
