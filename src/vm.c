@@ -165,7 +165,7 @@ void write_tape(uint16_t value) {
       size_t new_len = TAPE_GROWTH_FACTOR * head_offset;
 
       tape = realloc(tape, new_len * sizeof(uint16_t));
-      memset(&tape[old_len], 0, new_len - old_len);
+      memset(&tape[old_len], 0, (new_len - old_len)*sizeof(uint16_t));
       tape_head = &tape[head_offset];
       tape_end = &tape[new_len];
 
