@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <stdio.h>
+
 #define COMPARE_ARG 0
 #define COMPARE_VAL 1
 #define OTHER 2
@@ -96,6 +98,29 @@ State clone_state(State *state) {
            cloned.symbol_count * sizeof(uint16_t));
   }
   return cloned;
+}
+
+void print_state(State *state) {
+  printf("State(0x%08x", state->address);
+  for (size_t i = 0; i < state->state_count; i++) {
+    if (i) {
+      printf(", ");
+    } else {
+      printf("; ");
+    }
+    print_state(&state->states[i]);
+  }
+  if (state->symbol_count) {
+    for (size_t i = 0; i < state->symbol_count; i++) {
+      if (i) {
+        printf(", ");
+      } else {
+        printf("; ");
+      }
+      printf("%hu", state->symbols[i]);
+    }
+  }
+  printf(")");
 }
 
 void init_tape(uint16_t *symbols, size_t len) {
@@ -261,7 +286,7 @@ ControlFlow run_rhs() {
       }
       if (state.symbol_count) {
         state.symbols = malloc(state.symbol_count * sizeof(uint16_t));
-        memcpy(state.symbols, state_stack,
+        memcpy(state.symbols, symbol_stack,
                state.symbol_count * sizeof(uint16_t));
         symbol_stack_top = symbol_stack;
       }
