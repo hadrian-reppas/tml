@@ -117,7 +117,11 @@ impl Compiler {
 
         let arm_count = arms.len();
         for (i, arm) in arms.into_iter().enumerate() {
-            self.compile_arm(arm, &state_map, &symbol_map, i == arm_count - 1)?;
+            let is_last_arm = i == arm_count - 1;
+            let is_catchall = self.compile_arm(arm, &state_map, &symbol_map, is_last_arm)?;
+            if is_last_arm && !is_catchall {
+                self.bytes.push(bc::HALT);
+            }
         }
 
         Ok(())
@@ -133,7 +137,7 @@ impl Compiler {
         state_map: &HashMap<&'static str, u8>,
         symbol_map: &HashMap<&'static str, u8>,
         is_last_arm: bool,
-    ) -> Result<(), Error> {
+    ) -> Result<bool, Error> {
         let pattern_span = match &pattern {
             Pattern::Symbol(symbol) => symbol.span,
             Pattern::Name(name) => name.span,
@@ -142,7 +146,7 @@ impl Compiler {
         let bound = self.compile_pattern(pattern, symbol_map, is_last_arm)?;
 
         let location = self.bytes.len();
-        if !is_last_arm {
+        if bound.is_empty() {
             self.bytes.extend(u16::MAX.to_le_bytes());
         }
 
@@ -152,7 +156,7 @@ impl Compiler {
         count_state_args(&to_state, &mut counts)?;
         self.compile_to_state(to_state, state_map, symbol_map, &mut counts, bound, true)?;
 
-        if !is_last_arm {
+        if bound.is_empty() {
             let jump_size = self.bytes.len() - location - 2;
             match TryInto::<u16>::try_into(jump_size) {
                 Ok(jump_size) => {
@@ -168,7 +172,7 @@ impl Compiler {
             }
         }
 
-        Ok(())
+        Ok(!bound.is_empty())
     }
 
     fn compile_pattern(
@@ -179,40 +183,24 @@ impl Compiler {
     ) -> Result<&'static str, Error> {
         match pattern {
             Pattern::Symbol(symbol) => {
-                if is_last_arm {
-                    Err(Error::new(
-                        "last arm must be a catchall".to_string(),
-                        Some(symbol.span),
-                    ))
-                } else {
-                    let value = self.symbols.insert(symbol)?;
-                    self.bytes.push(bc::COMPARE_VAL);
-                    self.bytes.extend(value.to_le_bytes());
-                    Ok("")
-                }
+                let value = self.symbols.insert(symbol)?;
+                self.bytes.push(bc::COMPARE_VAL);
+                self.bytes.extend(value.to_le_bytes());
+                Ok("")
             }
             Pattern::Name(name) => {
                 if let Some(&arg_index) = symbol_map.get(name.name) {
-                    if is_last_arm {
-                        Err(Error::new(
-                            "last arm must be a catchall".to_string(),
-                            Some(name.span),
-                        ))
-                    } else {
-                        self.bytes.push(bc::COMPARE_ARG);
-                        self.bytes.push(arg_index);
-                        Ok("")
-                    }
+                    self.bytes.push(bc::COMPARE_ARG);
+                    self.bytes.push(arg_index);
+                    Ok("")
+                } else if is_last_arm {
+                    self.bytes.push(bc::OTHER);
+                    Ok(name.name)
                 } else {
-                    if is_last_arm {
-                        self.bytes.push(bc::OTHER);
-                        Ok(name.name)
-                    } else {
-                        Err(Error::new(
-                            "only the last arm can be a catchall".to_string(),
-                            Some(name.span),
-                        ))
-                    }
+                    Err(Error::new(
+                        "only the last arm can be a catchall".to_string(),
+                        Some(name.span),
+                    ))
                 }
             }
         }

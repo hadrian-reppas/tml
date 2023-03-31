@@ -70,10 +70,10 @@ impl Dumper<'_> {
         let count = self.next_u16();
 
         if self.no_color {
-            println!("\nnumber of states: {count}");
+            println!("number of states: {count}");
         } else {
             println!(
-                "\n{}{}number of states:{}{} {count}",
+                "{}{}number of states:{}{} {count}",
                 style::Bold,
                 color::Fg(color::Blue),
                 style::Reset,
@@ -139,11 +139,14 @@ impl Dumper<'_> {
             );
         }
 
-        let is_last_arm = self.pattern();
-        let mut seen_state = false;
+        let arm_kind = self.pattern();
+        if arm_kind == ArmKind::Halt {
+            return false;
+        }
 
         textln!(self, "instructions:", Blue);
 
+        let mut seen_state = false;
         macro_rules! state_instr {
             () => {
                 #[allow(unused_assignments)]
@@ -230,13 +233,13 @@ impl Dumper<'_> {
                     state_instr!();
                     text!(self, "    FINAL_STATE", Green);
                     println!(" (addr: {:#010x})", self.next_u32());
-                    return !is_last_arm;
+                    return arm_kind != ArmKind::Other;
                 }
                 FINAL_ARG => {
                     state_instr!();
                     text!(self, "    FINAL_ARG", Green);
                     println!(" (arg: {})", self.next_u8());
-                    return !is_last_arm;
+                    return arm_kind != ArmKind::Other;
                 }
 
                 _ => panic!("invalid bytecode"),
@@ -244,21 +247,25 @@ impl Dumper<'_> {
         }
     }
 
-    fn pattern(&mut self) -> bool {
+    fn pattern(&mut self) -> ArmKind {
         match self.next_u8() {
             COMPARE_ARG => {
                 text!(self, "    COMPARE_ARG", Green);
                 println!(" (arg: {}) (skip: {})", self.next_u8(), self.next_u16());
-                false
+                ArmKind::Continue
             }
             COMPARE_VAL => {
                 text!(self, "    COMPARE_VAL", Green);
                 println!(" (value: {}) (skip: {})", self.next_u16(), self.next_u16());
-                false
+                ArmKind::Continue
             }
             OTHER => {
                 textln!(self, "    OTHER", Green);
-                true
+                ArmKind::Other
+            }
+            HALT => {
+                textln!(self, "    HALT", Green);
+                ArmKind::Halt
             }
             _ => panic!("invalid bytecode"),
         }
@@ -281,4 +288,11 @@ impl Dumper<'_> {
             self.next_u8(),
         ])
     }
+}
+
+#[derive(PartialEq)]
+enum ArmKind {
+    Continue,
+    Other,
+    Halt,
 }
