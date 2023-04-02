@@ -11,6 +11,7 @@ mod error;
 mod ffi;
 mod lex;
 mod parse;
+mod tape;
 mod vm;
 
 #[derive(Parser, Debug)]
@@ -28,17 +29,9 @@ struct Arguments {
     #[arg(long = "hide-tape")]
     hide_tape: bool,
 
-    /// Don't print the final state
-    #[arg(long = "hide-state")]
-    hide_state: bool,
-
     /// Don't print the decimal interpretation of the final tape
     #[arg(long = "hide-decimal")]
     hide_decimal: bool,
-
-    /// Number of printed digits in the final decimal
-    #[arg(short = 'd', long = "decimal-digits")]
-    decimal_digits: Option<usize>,
 
     /// Radix for the final decimal
     #[arg(short = 'r', long = "decimal-radix", default_value_t = 2, value_parser = clap::value_parser!(u32).range(1..=36))]
@@ -46,15 +39,11 @@ struct Arguments {
 
     /// Start position for the final decimal
     #[arg(short = 's', long = "decimal-start", default_value_t = 2)]
-    decimal_start: usize,
+    decimal_start: u32,
 
     /// Stride for the final decimal
-    #[arg(short = 'S', long = "decimal-stride", default_value_t = 2)]
-    decimal_stride: usize,
-
-    /// Length (in squares) of the final decimal
-    #[arg(short = 'l', long = "decimal-length")]
-    decimal_length: Option<usize>,
+    #[arg(short = 'S', long = "decimal-stride", default_value_t = 2, value_parser = clap::value_parser!(u32).range(1..))]
+    decimal_stride: u32,
 
     /// Don't color output
     #[arg(long = "no-color")]
@@ -65,7 +54,7 @@ struct Arguments {
     allow_tabs: bool,
 
     /// Dump bytecode
-    #[arg(short = 'b', long = "dump-bytecode")]
+    #[arg(short = 'd', long = "dump-bytecode")]
     dump_bytecode: bool,
 
     /// Use Rust VM
@@ -75,6 +64,10 @@ struct Arguments {
     /// Time execution
     #[arg(short = 't', long = "time")]
     time: bool,
+
+    /// Maximum width when printing the final tape
+    #[arg(short = 'w', long = "terminal_width", value_parser = clap::value_parser!(u16).range(5..))]
+    terminal_width: Option<u16>,
 }
 
 fn main() -> ExitCode {
@@ -122,32 +115,77 @@ fn do_it(args: Arguments) -> Result<(), error::Error> {
 
     if args.time && args.no_color {
         println!("compile time: {compile_time:?}");
-        println!("execution time: {exec_time:?}");
+        println!("execution time: {exec_time:?}\n");
     } else if args.time {
         println!(
             "{}{}compile time:{}{} {compile_time:?}",
             style::Bold,
             color::Fg(color::Green),
             style::Reset,
-            color::Fg(color::Reset),
+            color::Fg(color::Reset)
         );
         println!(
-            "{}{}execution time:{}{} {exec_time:?}",
+            "{}{}execution time:{}{} {exec_time:?}\n",
             style::Bold,
             color::Fg(color::Green),
             style::Reset,
-            color::Fg(color::Reset),
+            color::Fg(color::Reset)
         );
     }
 
+    let tape: Vec<_> = simulated
+        .tape
+        .iter()
+        .map(|&i| compiled.symbols[i as usize].as_str())
+        .collect();
+
     if !args.hide_tape {
-        let mut symbol_tape = Vec::new();
-        for i in simulated.tape {
-            symbol_tape.push(&compiled.symbols[i as usize]);
+        let terminal_width = if let Some(width) = args.terminal_width {
+            width as usize
+        } else if let Ok((width, _)) = termion::terminal_size() {
+            width as usize
+        } else {
+            80
+        };
+
+        if args.no_color {
+            println!("final tape:");
+        } else {
+            println!(
+                "{}{}final tape:{}{}",
+                style::Bold,
+                color::Fg(color::Green),
+                style::Reset,
+                color::Fg(color::Reset)
+            );
         }
-        println!("{:?}", symbol_tape);
+
+        tape::dump(&tape, terminal_width);
     }
 
-    println!("{}", simulated.moves);
+    if !args.hide_decimal {
+        if args.no_color {
+            print!("decimal: ");
+        } else {
+            print!(
+                "{}{}decimal:{}{} ",
+                style::Bold,
+                color::Fg(color::Green),
+                style::Reset,
+                color::Fg(color::Reset)
+            );
+        }
+        tape::print_decimal(
+            &tape,
+            args.decimal_radix,
+            args.decimal_start as usize,
+            args.decimal_stride as usize,
+        );
+        println!("\n");
+    }
+
+    println!("moves: {}", simulated.moves);
+    println!("tape head: {}", simulated.head_position);
+    println!("final address: {}", simulated.final_address);
     Ok(())
 }
