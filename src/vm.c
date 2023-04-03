@@ -38,36 +38,36 @@
 #define CONTINUE false
 
 #ifdef DEBUG
-  void debug_free(void* p) {
-    printf("free %p\n", p);
-    free(p);
-  }
-  void* debug_malloc(size_t s) {
-    void* p = malloc(s);
-    printf("alloc %p\n", p);
-    return p;
-  }
-  void* debug_calloc(size_t n, size_t s) {
-    void* p = calloc(n, s);
-    printf("alloc %p\n", p);
-    return p;
-  }
-  void* debug_realloc(void* p, size_t s) {
-    printf("free %p\n", p);
-    p = realloc(p, s);
-    printf("alloc %p\n", p);
-    return p;
-  }
+void debug_free(void *p) {
+  printf("free %p\n", p);
+  free(p);
+}
+void *debug_malloc(size_t s) {
+  void *p = malloc(s);
+  printf("alloc %p\n", p);
+  return p;
+}
+void *debug_calloc(size_t n, size_t s) {
+  void *p = calloc(n, s);
+  printf("alloc %p\n", p);
+  return p;
+}
+void *debug_realloc(void *p, size_t s) {
+  printf("free %p\n", p);
+  p = realloc(p, s);
+  printf("alloc %p\n", p);
+  return p;
+}
 
-  #define FREE(p) debug_free((p))
-  #define MALLOC(s) debug_malloc((s))
-  #define CALLOC(n, s) debug_calloc((n), (s))
-  #define REALLOC(p, s) debug_realloc((p), (s))
+#define FREE(p) debug_free((p))
+#define MALLOC(s) debug_malloc((s))
+#define CALLOC(n, s) debug_calloc((n), (s))
+#define REALLOC(p, s) debug_realloc((p), (s))
 #else
-  #define FREE(p) free((p))
-  #define MALLOC(s) malloc((s))
-  #define CALLOC(n, s) calloc((n), (s))
-  #define REALLOC(p, s) realloc((p), (s))
+#define FREE(p) free((p))
+#define MALLOC(s) malloc((s))
+#define CALLOC(n, s) calloc((n), (s))
+#define REALLOC(p, s) realloc((p), (s))
 #endif
 
 typedef struct State {
@@ -201,7 +201,7 @@ void write_tape(uint16_t value) {
       size_t new_len = TAPE_GROWTH_FACTOR * head_offset;
 
       tape = REALLOC(tape, new_len * sizeof(uint16_t));
-      memset(&tape[old_len], 0, (new_len - old_len)*sizeof(uint16_t));
+      memset(&tape[old_len], 0, (new_len - old_len) * sizeof(uint16_t));
       tape_head = &tape[head_offset];
       tape_end = &tape[new_len];
 
