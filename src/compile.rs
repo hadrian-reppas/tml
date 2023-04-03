@@ -115,12 +115,16 @@ impl Compiler {
             ));
         }
 
-        let arm_count = arms.len();
-        for (i, arm) in arms.into_iter().enumerate() {
-            let is_last_arm = i == arm_count - 1;
-            let is_catchall = self.compile_arm(arm, &state_map, &symbol_map, is_last_arm)?;
-            if is_last_arm && !is_catchall {
-                self.bytes.push(bc::HALT);
+        if arms.len() == 0 {
+            self.bytes.push(bc::HALT);
+        } else {
+            let arm_count = arms.len();
+            for (i, arm) in arms.into_iter().enumerate() {
+                let is_last_arm = i == arm_count - 1;
+                let is_catchall = self.compile_arm(arm, &state_map, &symbol_map, is_last_arm)?;
+                if is_last_arm && !is_catchall {
+                    self.bytes.push(bc::HALT);
+                }
             }
         }
 

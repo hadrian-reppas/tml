@@ -37,6 +37,39 @@
 #define STOP true
 #define CONTINUE false
 
+#ifdef DEBUG
+  void debug_free(void* p) {
+    printf("free %p\n", p);
+    free(p);
+  }
+  void* debug_malloc(size_t s) {
+    void* p = malloc(s);
+    printf("alloc %p\n", p);
+    return p;
+  }
+  void* debug_calloc(size_t n, size_t s) {
+    void* p = calloc(n, s);
+    printf("alloc %p\n", p);
+    return p;
+  }
+  void* debug_realloc(void* p, size_t s) {
+    printf("free %p\n", p);
+    p = realloc(p, s);
+    printf("alloc %p\n", p);
+    return p;
+  }
+
+  #define FREE(p) debug_free((p))
+  #define MALLOC(s) debug_malloc((s))
+  #define CALLOC(n, s) debug_calloc((n), (s))
+  #define REALLOC(p, s) debug_realloc((p), (s))
+#else
+  #define FREE(p) free((p))
+  #define MALLOC(s) malloc((s))
+  #define CALLOC(n, s) calloc((n), (s))
+  #define REALLOC(p, s) realloc((p), (s))
+#endif
+
 typedef struct State {
   uint32_t address;
   struct State *states;
@@ -74,10 +107,13 @@ uint16_t bound;
 
 void free_state(State *state) {
   if (state->state_count) {
-    free(state->states);
+    for (size_t i = 0; i < state->state_count; i++) {
+      free_state(&state->states[i]);
+    }
+    FREE(state->states);
   }
   if (state->symbol_count) {
-    free(state->symbols);
+    FREE(state->symbols);
   }
 }
 
@@ -87,13 +123,13 @@ State clone_state(State *state) {
   cloned.state_count = state->state_count;
   cloned.symbol_count = state->symbol_count;
   if (cloned.state_count) {
-    cloned.states = malloc(cloned.state_count * sizeof(State));
+    cloned.states = MALLOC(cloned.state_count * sizeof(State));
     for (size_t i = 0; i < cloned.state_count; i++) {
       cloned.states[i] = clone_state(&state->states[i]);
     }
   }
   if (cloned.symbol_count) {
-    cloned.symbols = malloc(cloned.symbol_count * sizeof(uint16_t));
+    cloned.symbols = MALLOC(cloned.symbol_count * sizeof(uint16_t));
     memcpy(cloned.symbols, state->symbols,
            cloned.symbol_count * sizeof(uint16_t));
   }
@@ -125,10 +161,10 @@ void print_state(State *state) {
 
 void init_tape(uint16_t *symbols, size_t len) {
   if (len < INTIAL_TAPE_CAPACITY) {
-    tape = calloc(INTIAL_TAPE_CAPACITY, sizeof(uint16_t));
+    tape = CALLOC(INTIAL_TAPE_CAPACITY, sizeof(uint16_t));
     tape_end = &tape[INTIAL_TAPE_CAPACITY];
   } else {
-    tape = calloc(len, sizeof(uint16_t));
+    tape = CALLOC(len, sizeof(uint16_t));
     tape_end = &tape[len];
   }
   tape_head = tape;
@@ -164,7 +200,7 @@ void write_tape(uint16_t value) {
       size_t old_len = tape_end - tape;
       size_t new_len = TAPE_GROWTH_FACTOR * head_offset;
 
-      tape = realloc(tape, new_len * sizeof(uint16_t));
+      tape = REALLOC(tape, new_len * sizeof(uint16_t));
       memset(&tape[old_len], 0, (new_len - old_len)*sizeof(uint16_t));
       tape_head = &tape[head_offset];
       tape_end = &tape[new_len];
@@ -281,11 +317,11 @@ ControlFlow run_rhs() {
 
       if (state.state_count) {
         state_stack_top -= args;
-        state.states = malloc(args * sizeof(State));
+        state.states = MALLOC(args * sizeof(State));
         memcpy(state.states, state_stack_top, args * sizeof(State));
       }
       if (state.symbol_count) {
-        state.symbols = malloc(state.symbol_count * sizeof(uint16_t));
+        state.symbols = MALLOC(state.symbol_count * sizeof(uint16_t));
         memcpy(state.symbols, symbol_stack,
                state.symbol_count * sizeof(uint16_t));
         symbol_stack_top = symbol_stack;
@@ -318,13 +354,13 @@ ControlFlow run_rhs() {
       state_count = state.state_count;
       if (state_count) {
         memcpy(states, &state.states[0], state.state_count * sizeof(State));
-        free(state.states);
+        FREE(state.states);
       }
       symbol_count = state.symbol_count;
       if (symbol_count) {
         memcpy(symbols, &state.symbols[0],
                state.symbol_count * sizeof(uint8_t));
-        free(state.symbols);
+        FREE(state.symbols);
       }
       go_to(address);
       return CONTINUE;
@@ -397,7 +433,7 @@ size_t get_tape_head_position() { return tape_head - tape; }
 size_t get_move_count() { return moves; }
 
 void cleanup() {
-  free(tape);
+  FREE(tape);
   for (size_t i = 0; i < state_count; i++) {
     free_state(&states[i]);
   }

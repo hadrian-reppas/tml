@@ -112,6 +112,7 @@ fn do_it(args: Arguments) -> Result<(), error::Error> {
     };
 
     let exec_time = start.elapsed();
+    println!();
 
     if args.time && args.no_color {
         println!("compile time: {compile_time:?}");
@@ -184,8 +185,27 @@ fn do_it(args: Arguments) -> Result<(), error::Error> {
         println!("\n");
     }
 
-    println!("moves: {}", simulated.moves);
-    println!("tape head: {}", simulated.head_position);
-    println!("final address: {}", simulated.final_address);
+    if args.no_color {
+        println!("number of moves: {}", simulated.moves);
+        println!("final head position: {}\n", simulated.head_position);
+    } else {
+        println!(
+            "{}{}number of moves:{}{} {}",
+            style::Bold,
+            color::Fg(color::Green),
+            style::Reset,
+            color::Fg(color::Reset),
+            simulated.moves
+        );
+        println!(
+            "{}{}final head position:{}{} {}\n",
+            style::Bold,
+            color::Fg(color::Green),
+            style::Reset,
+            color::Fg(color::Reset),
+            simulated.head_position
+        );
+    }
+
     Ok(())
 }
