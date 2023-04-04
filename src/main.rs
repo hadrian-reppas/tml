@@ -7,8 +7,11 @@ use termion::{color, style};
 
 mod bytecode;
 mod compile;
+mod decimal;
+mod digit;
 mod error;
 mod ffi;
+mod int;
 mod lex;
 mod parse;
 mod tape;
@@ -37,6 +40,10 @@ struct Arguments {
     #[arg(short = 'r', long = "decimal-radix", default_value_t = 2, value_parser = clap::value_parser!(u32).range(1..=36))]
     decimal_radix: u32,
 
+    /// Digits in the final decimal
+    #[arg(short = 'd', long = "decimal-digits", value_parser = clap::value_parser!(u32).range(3..))]
+    decimal_digits: Option<u32>,
+
     /// Start position for the final decimal
     #[arg(short = 's', long = "decimal-start", default_value_t = 2)]
     decimal_start: u32,
@@ -54,7 +61,7 @@ struct Arguments {
     allow_tabs: bool,
 
     /// Dump bytecode
-    #[arg(short = 'd', long = "dump-bytecode")]
+    #[arg(short = 'b', long = "dump-bytecode")]
     dump_bytecode: bool,
 
     /// Use Rust VM
@@ -165,24 +172,24 @@ fn do_it(args: Arguments) -> Result<(), error::Error> {
     }
 
     if !args.hide_decimal {
+        let decimal = tape::parse_decimal(
+            &tape,
+            args.decimal_radix as usize,
+            args.decimal_digits.map(|d| d as usize),
+            args.decimal_start as usize,
+            args.decimal_stride as usize,
+        );
         if args.no_color {
-            print!("decimal: ");
+            print!("decimal: {decimal}\n");
         } else {
             print!(
-                "{}{}decimal:{}{} ",
+                "{}{}decimal:{}{} {decimal}\n",
                 style::Bold,
                 color::Fg(color::Green),
                 style::Reset,
                 color::Fg(color::Reset)
             );
         }
-        tape::print_decimal(
-            &tape,
-            args.decimal_radix,
-            args.decimal_start as usize,
-            args.decimal_stride as usize,
-        );
-        println!("\n");
     }
 
     if args.no_color {

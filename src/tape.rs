@@ -1,8 +1,12 @@
+use std::cmp;
 use std::iter::Peekable;
 
 use bigdecimal::BigDecimal;
 use num_bigint::BigInt;
 use unicode_segmentation::UnicodeSegmentation;
+
+use crate::decimal::Decimal;
+use crate::int::Int;
 
 pub fn dump(tape: &[&str], terminal_width: usize) {
     if tape.is_empty() {
@@ -57,9 +61,14 @@ fn print_line(symbols: &[&str]) {
     println!();
 }
 
-// TODO: fix this
-pub fn print_decimal(tape: &[&str], radix: u32, start: usize, stride: usize) {
-    let tape: String = tape
+pub fn parse_decimal(
+    tape: &[&str],
+    radix: usize,
+    digits: Option<usize>,
+    start: usize,
+    stride: usize,
+) -> Decimal {
+    let symbols: Vec<_> = tape
         .iter()
         .copied()
         .skip(start)
@@ -67,28 +76,35 @@ pub fn print_decimal(tape: &[&str], radix: u32, start: usize, stride: usize) {
         .map_while(|symbol| to_char_radix(symbol, radix))
         .collect();
 
-    if tape.is_empty() {
-        print!("0.0");
+    let digits = if let Some(digits) = digits {
+        digits as usize
     } else {
-        let int = BigInt::parse_bytes(tape.as_bytes(), radix).unwrap();
-        let decimal = BigDecimal::new(int, 0).with_prec(1000);
-        let power = BigInt::from(radix).pow(tape.len() as u32);
-        let coeff = BigDecimal::new(power, 0).with_prec(1000);
-        let result = format!("{}", decimal / coeff);
-        if result
-            .chars()
-            .filter(|c| c.is_ascii_digit())
-            .all(|c| c == '0')
-        {
-            print!("0.0");
-        } else {
-            print!("{result}");
+        let len = symbols.len() as f64;
+        let radix = radix as f64;
+        cmp::max(3, (len * radix.log(10.0)).ceil() as usize)
+    };
+
+    if tape.is_empty() {
+        Decimal::zero(digits)
+    } else {
+        let mut decimal = Decimal::zero(2 * digits);
+        let mut power = Int::from(radix);
+        let radix = Int::from(radix);
+
+        for symbol in symbols {
+            let digit = Int::from_hex_digit(symbol);
+            let coeff = power.inverse(2 * digits);
+            let term = &coeff * &digit;
+            decimal = &decimal + &term;
+            power = &radix * &power;
         }
+
+        decimal.trim(digits)
     }
 }
 
-fn to_char_radix(symbol: &str, radix: u32) -> Option<char> {
-    if symbol.len() == 1 && u32::from_str_radix(symbol, radix).is_ok() {
+fn to_char_radix(symbol: &str, radix: usize) -> Option<char> {
+    if symbol.len() == 1 && u32::from_str_radix(symbol, radix as u32).is_ok() {
         symbol.chars().next()
     } else {
         None
