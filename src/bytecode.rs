@@ -1,27 +1,27 @@
 use termion::{color, style};
 
-pub const COMPARE_ARG: u8 = 0;
-pub const COMPARE_VAL: u8 = 1;
-pub const OTHER: u8 = 2;
-pub const HALT: u8 = 3;
+pub const LEFT: u8 = 0;
+pub const RIGHT: u8 = 1;
+pub const LEFT_N: u8 = 2;
+pub const RIGHT_N: u8 = 3;
+pub const WRITE_ARG: u8 = 4;
+pub const WRITE_VAL: u8 = 5;
+pub const WRITE_BOUND: u8 = 6;
 
-pub const LEFT: u8 = 4;
-pub const RIGHT: u8 = 5;
-pub const LEFT_N: u8 = 6;
-pub const RIGHT_N: u8 = 7;
-pub const WRITE_ARG: u8 = 8;
-pub const WRITE_VAL: u8 = 9;
-pub const WRITE_BOUND: u8 = 10;
+pub const SYMBOL_ARG: u8 = 7;
+pub const SYMBOL_VAL: u8 = 8;
+pub const SYMBOL_BOUND: u8 = 9;
+pub const TAKE_ARG: u8 = 10;
+pub const CLONE_ARG: u8 = 11;
+pub const FREE_ARG: u8 = 12;
+pub const MAKE_STATE: u8 = 13;
+pub const FINAL_STATE: u8 = 14;
+pub const FINAL_ARG: u8 = 15;
 
-pub const SYMBOL_ARG: u8 = 11;
-pub const SYMBOL_VAL: u8 = 12;
-pub const SYMBOL_BOUND: u8 = 13;
-pub const TAKE_ARG: u8 = 14;
-pub const CLONE_ARG: u8 = 15;
-pub const FREE_ARG: u8 = 16;
-pub const MAKE_STATE: u8 = 17;
-pub const FINAL_STATE: u8 = 18;
-pub const FINAL_ARG: u8 = 19;
+pub const COMPARE_ARG: u8 = 16;
+pub const COMPARE_VAL: u8 = 17;
+pub const OTHER: u8 = 18;
+pub const HALT: u8 = 19;
 
 pub const HALT_ADDRESS: u32 = 6;
 

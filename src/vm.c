@@ -6,28 +6,28 @@
 
 #include <stdio.h>
 
-#define COMPARE_ARG 0
-#define COMPARE_VAL 1
-#define OTHER 2
-#define HALT 3
+#define LEFT 0
+#define RIGHT 1
+#define LEFT_N 2
+#define RIGHT_N 3
+#define WRITE_ARG 4
+#define WRITE_VAL 5
+#define WRITE_BOUND 6
 
-#define LEFT 4
-#define RIGHT 5
-#define LEFT_N 6
-#define RIGHT_N 7
-#define WRITE_ARG 8
-#define WRITE_VAL 9
-#define WRITE_BOUND 10
+#define SYMBOL_ARG 7
+#define SYMBOL_VAL 8
+#define SYMBOL_BOUND 9
+#define TAKE_ARG 10
+#define CLONE_ARG 11
+#define FREE_ARG 12
+#define MAKE_STATE 13
+#define FINAL_STATE 14
+#define FINAL_ARG 15
 
-#define SYMBOL_ARG 11
-#define SYMBOL_VAL 12
-#define SYMBOL_BOUND 13
-#define TAKE_ARG 14
-#define CLONE_ARG 15
-#define FREE_ARG 16
-#define MAKE_STATE 17
-#define FINAL_STATE 18
-#define FINAL_ARG 19
+#define COMPARE_ARG 16
+#define COMPARE_VAL 17
+#define OTHER 18
+#define HALT 19
 
 #define INTIAL_TAPE_CAPACITY 256
 #define TAPE_GROWTH_FACTOR 2
@@ -241,6 +241,121 @@ void push_state(State state) {
 }
 
 ControlFlow run_rhs() {
+#ifdef USE_COMPUTED_GOTO
+  static void *dispatch_table[] = {
+      &&do_left,       &&do_right,        &&do_left_n,      &&do_right_n,
+      &&do_write_arg,  &&do_write_val,    &&do_write_bound, &&do_symbol_arg,
+      &&do_symbol_val, &&do_symbol_bound, &&do_take_arg,    &&do_clone_arg,
+      &&do_free_arg,   &&do_make_state,   &&do_final_state, &&do_final_arg,
+  };
+#define DISPATCH() goto *dispatch_table[next()]
+
+  DISPATCH();
+  while (true) {
+  do_left:
+    if (tape_left(1) == STOP) {
+      return STOP;
+    }
+    DISPATCH();
+  do_right:
+    tape_right(1);
+    DISPATCH();
+  do_left_n:
+    if (tape_left(next()) == STOP) {
+      return STOP;
+    }
+    DISPATCH();
+  do_right_n:
+    tape_right(next());
+    DISPATCH();
+  do_write_arg:
+    write_tape(symbols[next()]);
+    DISPATCH();
+  do_write_val:
+    write_tape(next_u16());
+    DISPATCH();
+  do_write_bound:
+    write_tape(bound);
+    DISPATCH();
+  do_symbol_arg:
+    push_symbol(symbols[next()]);
+    DISPATCH();
+  do_symbol_val:
+    push_symbol(next_u16());
+    DISPATCH();
+  do_symbol_bound:
+    push_symbol(bound);
+    DISPATCH();
+  do_take_arg:
+    push_state(states[next()]);
+    DISPATCH();
+  do_clone_arg:
+    push_state(clone_state(&states[next()]));
+    DISPATCH();
+  do_free_arg:
+    free_state(&states[next()]);
+    DISPATCH();
+  do_make_state : {
+    uint8_t args = next();
+    uint32_t address = next_u32();
+
+    State state;
+    state.address = address;
+    state.state_count = args;
+    state.symbol_count = symbol_stack_top - symbol_stack;
+
+    if (state.state_count) {
+      state_stack_top -= args;
+      state.states = MALLOC(args * sizeof(State));
+      memcpy(state.states, state_stack_top, args * sizeof(State));
+    }
+    if (state.symbol_count) {
+      state.symbols = MALLOC(state.symbol_count * sizeof(uint16_t));
+      memcpy(state.symbols, symbol_stack,
+             state.symbol_count * sizeof(uint16_t));
+      symbol_stack_top = symbol_stack;
+    }
+
+    push_state(state);
+    DISPATCH();
+  }
+  do_final_state : {
+    address = next_u32();
+    state_count = state_stack_top - state_stack;
+    symbol_count = symbol_stack_top - symbol_stack;
+
+    if (state_count) {
+      memcpy(states, state_stack, state_count * sizeof(State));
+      state_stack_top = state_stack;
+    }
+    if (symbol_count) {
+      memcpy(symbols, symbol_stack, symbol_count * sizeof(uint16_t));
+      symbol_stack_top = symbol_stack;
+    }
+
+    go_to(address);
+    return CONTINUE;
+  }
+  do_final_arg : {
+    uint8_t arg_index = next();
+    State state = states[arg_index];
+    address = state.address;
+    state_count = state.state_count;
+    if (state_count) {
+      memcpy(states, &state.states[0], state.state_count * sizeof(State));
+      FREE(state.states);
+    }
+    symbol_count = state.symbol_count;
+    if (symbol_count) {
+      memcpy(symbols, &state.symbols[0], state.symbol_count * sizeof(uint8_t));
+      FREE(state.symbols);
+    }
+
+    go_to(address);
+    return CONTINUE;
+  }
+  }
+#else
   while (true) {
     switch (next()) {
     case LEFT: {
@@ -367,6 +482,7 @@ ControlFlow run_rhs() {
     }
     }
   }
+#endif
 }
 
 ControlFlow run_move() {
