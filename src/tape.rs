@@ -6,11 +6,13 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::decimal::Decimal;
 use crate::int::Int;
 
+const EXTRA_DIGITS: usize = 10;
+
 pub fn dump(tape: &[&str], terminal_width: usize) {
     if tape.is_empty() {
-        println!("┌──┬──┬");
+        println!("┬──┬──┬");
         println!("│  │  │");
-        println!("└──┴──┴");
+        println!("┴──┴──┴");
     }
 
     let mut symbols = tape.iter().copied().peekable();
@@ -85,19 +87,19 @@ pub fn parse_decimal(
     if tape.is_empty() {
         Decimal::zero(digits)
     } else {
-        let mut decimal = Decimal::zero(2 * digits);
+        let mut decimal = Decimal::zero(digits + EXTRA_DIGITS);
         let mut power = Int::from(radix);
         let radix = Int::from(radix);
 
         for symbol in symbols {
             let digit = Int::from_hex_digit(symbol);
-            let coeff = power.inverse(2 * digits);
+            let coeff = power.inverse(digits + EXTRA_DIGITS);
             let term = &coeff * &digit;
             decimal = &decimal + &term;
             power = &radix * &power;
         }
 
-        decimal.trim(digits)
+        decimal.trim(EXTRA_DIGITS)
     }
 }
 
