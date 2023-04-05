@@ -1,0 +1,148 @@
+start {
+    '' | '@' > '@' > '1' | new,
+}
+
+new {
+    '@' | > | mark_digits,
+    _   | < | new,
+}
+
+mark_digits {
+    '0' | > 'x' > | mark_digits,
+    '1' | > 'x' > | mark_digits,
+    ''  | > 'z' >> 'r' | find_x,
+}
+
+find_x {
+    'x' | '' | first_r,
+    '@' |    | find_digits,
+    _   | << | find_x,
+}
+
+first_r {
+    'r' | >> | last_r,
+    _   | >> | first_r,
+}
+
+last_r {
+    'r' | >> | last_r,
+    ''  | 'r' >> 'r' | find_x,
+}
+
+find_digits {
+    '@' | >> | find_1st_digit,
+    _   | << | find_digits,
+}
+
+find_1st_digit {
+    'x' | <  | found_1st_digit,
+    'y' | <  | found_1st_digit,
+    'z' | <  | found_2nd_digit,
+    ''  | >> | find_1st_digit,
+}
+
+found_1st_digit {
+    '0' | >   | add_zero,
+    '1' | >>> | find_2nd_digit,
+}
+
+find_2nd_digit {
+    'x' | <  | found_2nd_digit,
+    'y' | <  | found_2nd_digit,
+    ''  | >> | find_2nd_digit,
+}
+
+found_2nd_digit {
+    '0' | > | add_zero,
+    '1' | > | add_one,
+    ''  | > | add_one,
+}
+
+add_zero {
+    'r' | 's' | add_finished,
+    'u' | 'v' | add_finished,
+    _   | >>  | add_zero,
+}
+
+add_one {
+    'r' | 'v'    | add_finished,
+    'u' | 's' >> | carry,
+    _   | >>     | add_one,
+}
+
+carry {
+    'r' | 'u'    | add_finished,
+    ''  | 'u'    | new_digit_is_zero,
+    'u' | 'r' >> | carry,
+}
+
+add_finished {
+    '@' | >> | erase_old_x,
+    _   | << | add_finished,
+}
+
+erase_old_x {
+    'x' | '' <<  | print_new_x,
+    'z' | 'y' << | print_new_x,
+    _   | >>     | erase_old_x,
+}
+
+print_new_x {
+    '@' | >>  | erase_old_y,
+    'y' | 'z' | find_digits,
+    ''  | 'x' | find_digits,
+}
+
+erase_old_y {
+    'y' | '' << | print_new_y,
+    _   | >>    | erase_old_y,
+}
+
+print_new_y {
+    '@' | >     | new_digit_is_one,
+    _   | 'y' > | reset_new_x,
+}
+
+reset_new_x {
+    '' | > 'x' | flag_result_digits,
+    _  | >>    | reset_new_x,
+}
+
+flag_result_digits {
+    's' | 't' >> | unflag_result_digits,
+    'v' | 'w' >> | unflag_result_digits,
+    _   | >>     | flag_result_digits,
+}
+
+unflag_result_digits {
+    's' | 'r' >> | unflag_result_digits,
+    'v' | 'u' >> | unflag_result_digits,
+    _   |        | find_digits,
+}
+
+new_digit_is_zero {
+    '@' | > | print_zero_digit,
+    _   | < | new_digit_is_zero,
+}
+
+print_zero_digit {
+    '0' | > '' >  | print_zero_digit,
+    '1' | > '' >  | print_zero_digit,
+    ''  | '0' >>> | cleanup,
+}
+
+new_digit_is_one {
+    '@' | > | print_one_digit,
+    _   | < | new_digit_is_one,
+}
+
+print_one_digit {
+    '0' | > '' >  | print_one_digit,
+    '1' | > '' >  | print_one_digit,
+    ''  | '1' >>> | cleanup,
+}
+
+cleanup {
+    '' |       | new,
+    _  | '' >> | cleanup, 
+}
