@@ -14,9 +14,9 @@ fn main() {
                     .file("src/vm.c")
                     .opt_level(3)
                     .define("USE_COMPUTED_GOTO", "1")
-                    .compile("vm")
+                    .compile("vm");
             } else {
-                cc::Build::new().file("src/vm.c").opt_level(3).compile("vm")
+                cc::Build::new().file("src/vm.c").opt_level(3).compile("vm");
             }
         }
         _ => unreachable!(),

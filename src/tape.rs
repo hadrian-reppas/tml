@@ -1,8 +1,6 @@
 use std::cmp;
 use std::iter::Peekable;
 
-use bigdecimal::BigDecimal;
-use num_bigint::BigInt;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::decimal::Decimal;
@@ -77,7 +75,7 @@ pub fn parse_decimal(
         .collect();
 
     let digits = if let Some(digits) = digits {
-        digits as usize
+        digits
     } else {
         let len = symbols.len() as f64;
         let radix = radix as f64;

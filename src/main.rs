@@ -180,9 +180,9 @@ fn do_it(args: Arguments) -> Result<(), error::Error> {
             args.decimal_stride as usize,
         );
         if args.no_color {
-            print!("decimal: {decimal}\n");
+            println!("decimal: {decimal}\n");
         } else {
-            print!(
+            println!(
                 "{}{}decimal:{}{} {decimal}\n",
                 style::Bold,
                 color::Fg(color::Green),

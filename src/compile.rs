@@ -57,10 +57,10 @@ impl Compiler {
             self.compile_state(state)?;
         }
 
-        for (signature, refs) in &self.forward_refs {
+        if let Some((signature, refs)) = self.forward_refs.iter().next() {
             let span = refs[0].span;
             return Err(Error::new(
-                format!("no function with signature `{}`", signature),
+                format!("no function with signature `{signature}`"),
                 Some(span),
             ));
         }
@@ -110,12 +110,12 @@ impl Compiler {
         }
         if self.addresses.insert(signature, address).is_some() {
             return Err(Error::new(
-                format!("a function with signature `{}` already exists", signature),
+                format!("a function with signature `{signature}` already exists"),
                 Some(name.span),
             ));
         }
 
-        if arms.len() == 0 {
+        if arms.is_empty() {
             self.bytes.push(bc::HALT);
         } else {
             let arm_count = arms.len();
@@ -469,9 +469,8 @@ fn make_map(params: &[Name], kind: &str) -> Result<HashMap<&'static str, u8>, Er
                 format!("too many {kind} parameters (max is 255)"),
                 Some(name.span),
             ));
-        } else {
-            map.insert(name.name, map.len() as u8);
         }
+        map.insert(name.name, map.len() as u8);
     }
 
     Ok(map)

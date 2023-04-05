@@ -69,10 +69,9 @@ impl Vm<'_> {
         loop {
             if self.moves == self.max_moves {
                 return ControlFlow::Break(());
-            } else {
-                self.run_move()?;
-                self.moves += 1;
             }
+            self.run_move()?;
+            self.moves += 1;
         }
     }
 
@@ -85,9 +84,8 @@ impl Vm<'_> {
                         self.bytes.next_u16();
                         self.rhs()?;
                         return ControlFlow::Continue(());
-                    } else {
-                        self.bytes.skip();
                     }
+                    self.bytes.skip();
                 }
                 bc::COMPARE_VAL => {
                     let value = self.bytes.next_u16();
@@ -95,9 +93,8 @@ impl Vm<'_> {
                         self.bytes.next_u16();
                         self.rhs()?;
                         return ControlFlow::Continue(());
-                    } else {
-                        self.bytes.skip();
                     }
+                    self.bytes.skip();
                 }
                 bc::OTHER => {
                     self.bound = self.tape.read();
@@ -135,11 +132,7 @@ impl Vm<'_> {
                     self.symbol_stack.push(value);
                 }
                 bc::SYMBOL_BOUND => self.symbol_stack.push(self.bound),
-                bc::TAKE_ARG => {
-                    let arg_index = self.bytes.next() as usize;
-                    self.state_stack.push(self.state.states[arg_index].clone());
-                }
-                bc::CLONE_ARG => {
+                bc::TAKE_ARG | bc::CLONE_ARG => {
                     let arg_index = self.bytes.next() as usize;
                     self.state_stack.push(self.state.states[arg_index].clone());
                 }
