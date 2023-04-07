@@ -5,7 +5,7 @@ a book by Charles Petzold. It goes through Turing's 1936 paper [On Computable Nu
 To simulate some of the Turing machines described in the book, I created `tml`. 
 (I was going to call it Hadrian's Turing Machine Language and use `.html` file
 extension but that confuses text editors.) I designed the language to share
-most of syntax Turing uses in his paper.
+most of the syntax Turing uses in his paper.
 
 ## Examples
 
@@ -32,16 +32,16 @@ head to move right.
 You can read the `f` state like this:
  1. If the symbol under the machine's head is `'0'`, then move the head to the
     right, print `'1'` and go to state `f`.
- 2. If The symbol under the machine's head is `'1`', then move the head to the
-    right, print '`0`' and go to state `f`.
+ 2. If The symbol under the machine's head is `'1'`, then move the head to the
+    right, print `'0'` and go to state `f`.
  3. Otherwise, halt.
 
 Every machine must contain a state named `start`. When we run the machine, it
 starts at the `start` state with an infinite tape filled with `''` symbols. The
 `start` state looks at the symbol under the machine's head. Since the symbol is
 `''`, we move into the that arm, print a `'0'` and go to state `f`. State `f`
-looks at the current symbol, moves to the right, prints the other symbol and
-returns to state `f`.
+looks at the current symbol, moves to the right, prints the opposite symbol and
+returns back to state `f`.
 
 If we put our machine in a file called `simple.tml`, we can simulate 10 moves with
 
@@ -66,7 +66,7 @@ final head position: 9
 ## Functions
 
 Just like in Turing's paper, you can define functions. Consider the following
-state:
+function:
 
 ```
 match(A, B; x) {
@@ -119,7 +119,7 @@ symbol at the machine's head is `'x'`.
 
 ## The final decimal
 
-Because Turing's paper focuses on computable numbers, `tmi` automaticaly
+Because Turing's paper focuses on computable numbers, `tml` automaticaly
 interprets the final tape as a number between 0 and 1. Consider the following
 machine (that can be found in `examples/turing_2.tml`):
 
@@ -135,7 +135,7 @@ b {
 }
 ```
 
-If we run with it with
+If we run it with it with
 
 ```
 cargo run -- examples/turing_2.tml -m 20
@@ -170,7 +170,7 @@ stride with the `-S` or `--decimal-stride` flags. The stride defaults to 2.
 
 ## How it works
 
-The `.tml` file is interpreted in two steps. First, it is compiled into a
+The `.tml` file is interpreted in two steps. First, it is compiled into
 bytecode. Then the bytecode is interpreted by a virtual machine. The default
 VM is written in C, but you can use a VM written in safe Rust with the 
 `--rust-vm` flag. The Rust VM is about 10% slower. You can inspect the generated
@@ -197,6 +197,39 @@ decimal: 0.70710678118654752440084436210484903928483593768847
 
 number of moves: 1000000000
 final head position: 307
+```
+
+`examples/hex_pi.tml` prints the first 50 hexidecimal digits of $\pi/10$. To
+run it use
+
+```
+cargo run -- examples/hex_pi.tml -r 16
+```
+
+which outputs
+
+```
+final tape:
+┬───┬───┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬
+│ @ │ @ │ 5 │  │ 0 │  │ 6 │  │ C │  │ B │  │ D │  │ D │  │ A │  │ 7 │  │ 3 │  │
+┴───┴───┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴
+┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬
+│ C │  │ 3 │  │ 8 │  │ 0 │  │ E │  │ 1 │  │ E │  │ 8 │  │ 4 │  │ F │  │ 5 │  │
+┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴
+┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬
+│ A │  │ 9 │  │ E │  │ 3 │  │ 3 │  │ 8 │  │ B │  │ 3 │  │ E │  │ B │  │ A │  │
+┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴
+┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬
+│ 1 │  │ 0 │  │ 6 │  │ 7 │  │ 5 │  │ 2 │  │ 6 │  │ 9 │  │ D │  │ 0 │  │ F │  │
+┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴
+┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬──┬───┬
+│ 6 │  │ 5 │  │ 1 │  │ C │  │ 8 │  │ 0 │  │ 0 │
+┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴──┴───┴
+
+decimal: 0.3141592653589793238462643383279502884197169399375105820974939
+
+number of moves: 1
+final head position: 100
 ```
 
 ## Usage
