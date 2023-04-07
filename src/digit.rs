@@ -1,15 +1,18 @@
+use std::mem;
+
+#[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Digit {
-    Zero,
-    One,
-    Two,
-    Three,
-    Four,
-    Five,
-    Six,
-    Seven,
-    Eight,
-    Nine,
+    Zero = 0,
+    One = 1,
+    Two = 2,
+    Three = 3,
+    Four = 4,
+    Five = 5,
+    Six = 6,
+    Seven = 7,
+    Eight = 8,
+    Nine = 9,
 }
 
 use Digit::*;
@@ -20,9 +23,9 @@ impl Digit {
         let o: usize = other.into();
         let sum = s + o + usize::from(carry);
         if sum > 9 {
-            (Digit::try_from(sum - 10).unwrap(), true)
+            (unsafe { Digit::new_unchecked(sum - 10) }, true)
         } else {
-            (Digit::try_from(sum).unwrap(), false)
+            (unsafe { Digit::new_unchecked(sum) }, false)
         }
     }
 
@@ -33,8 +36,8 @@ impl Digit {
         let prod = s * o + c;
         let (tens, ones) = (prod / 10, prod % 10);
         (
-            Digit::try_from(ones).unwrap(),
-            Digit::try_from(tens).unwrap(),
+            unsafe { Digit::new_unchecked(ones) },
+            unsafe { Digit::new_unchecked(tens) },
         )
     }
 
@@ -42,9 +45,9 @@ impl Digit {
         let s: usize = self.into();
         let o: usize = other.into();
         if s < o {
-            (Digit::try_from(s + 10 - o).unwrap(), true)
+            (unsafe { Digit::new_unchecked(s + 10 - o) }, true)
         } else {
-            (Digit::try_from(s - o).unwrap(), false)
+            (unsafe { Digit::new_unchecked(s - o) }, false)
         }
     }
 
@@ -77,6 +80,10 @@ impl Digit {
             Nine => *self = Eight,
         }
         self == &Nine
+    }
+
+    pub unsafe fn new_unchecked(digit: usize) -> Digit {
+        mem::transmute(digit as u8)
     }
 }
 

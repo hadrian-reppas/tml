@@ -101,7 +101,7 @@ impl From<usize> for Int {
     fn from(mut i: usize) -> Int {
         let mut int = Vec::new();
         while i != 0 {
-            int.push(Digit::try_from(i % 10).unwrap());
+            int.push(unsafe { Digit::new_unchecked(i % 10) });
             i /= 10;
         }
         Int(int)
