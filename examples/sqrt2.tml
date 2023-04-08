@@ -8,8 +8,8 @@ new {
 }
 
 mark_digits {
-    '0' | > 'x' > | mark_digits,
-    '1' | > 'x' > | mark_digits,
+    '0' | > 'x' >      | mark_digits,
+    '1' | > 'x' >      | mark_digits,
     ''  | > 'z' >> 'r' | find_x,
 }
 
@@ -25,7 +25,7 @@ first_r {
 }
 
 last_r {
-    'r' | >> | last_r,
+    'r' | >>         | last_r,
     ''  | 'r' >> 'r' | find_x,
 }
 
